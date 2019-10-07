@@ -1,3 +1,4 @@
+#!/usr/bin/python3
 # -*- coding: utf-8 -*-
 # author: William Melicher
 from __future__ import print_function
@@ -2599,51 +2600,51 @@ def parse_args():
         "config_cmdline": "",
     }
     for i in range(argc):
-        if argv[i] == "--pwd-file":
+        if argv[i] == "--lstm-pwd-file":
             if not args.get("pwd_file"):
                 args["pwd_file"] = [argv[i + 1]]
             else:
                 args["pwd_file"].append(argv[i + 1])
-        elif argv[i] == "--arch-file":
+        elif argv[i] == "--lstm-arch-file":
             args["arch_file"] = argv[i + 1]
-        elif argv[i] == "--weight-file":
+        elif argv[i] == "--lstm-weight-file":
             args["weight_file"] = argv[i + 1]
-        elif argv[i] == "--pwd-format":
+        elif argv[i] == "--lstm-pwd-format":
             if not args.get("pwd_format"):
                 args["pwd_format"] = [argv[i + 1]]
             else:
                 args["pwd_format"].append(argv[i + 1])
-        elif argv[i] == "--enumerate-ofile":
+        elif argv[i] == "--lstm-enumerate-ofile":
             args["enumerate_ofile"] = argv[i + 1]
-        elif argv[i] == "--retrain":
+        elif argv[i] == "--lstm-retrain":
             args["retrain"] = True
-        elif argv[i] == "--config":
+        elif argv[i] == "--lstm-config":
             args["config"] = argv[i + 1]
-        elif argv[i] == "--args":
+        elif argv[i] == "--lstm-args":
             args["args"] = argv[i + 1]
-        elif argv[i] == "--profile":
+        elif argv[i] == "--lstm-profile":
             args["profile"] = argv[i + 1]
-        elif argv[i] == "--log-file":
+        elif argv[i] == "--lstm-log-file":
             args["log_file"] = argv[i + 1]
-        elif argv[i] == "--log-level":
+        elif argv[i] == "--lstm-log-level":
             args["log_level"] = argv[i + 1]
-        elif argv[i] == "--version":
+        elif argv[i] == "--lstm-version":
             args["version"] = True
-        elif argv[i] == "--pre-processing-only":
+        elif argv[i] == "--lstm-pre-processing-only":
             args["pre_processing_only"] = True
-        elif argv[i] == "--stats-only":
+        elif argv[i] == "--lstm-stats-only":
             args["stats_only"] = True
-        elif argv[i] == "--config-args":
+        elif argv[i] == "--lstm-config-args":
             args["config_args"] = argv[i + 1]
-        elif argv[i] == "--calc-probability-only":
+        elif argv[i] == "--lstm-calc-probability-only":
             args["calc_probability_only"] = True
-        elif argv[i] == "--calc-guess-number-from-cache":
+        elif argv[i] == "--lstm-calc-guess-number-from-cache":
             args["calc_guess_number_from_cache"] = True
-        elif argv[i] == "--train-secondary-only":
+        elif argv[i] == "--lstm-train-secondary-only":
             args["train_secondary_only"] = True
-        elif argv[i] == "--multi-gpu":
+        elif argv[i] == "--lstm-multi-gpu":
             args["multi_gpu"] = int(argv[i + 1])
-        elif argv[i] == "--config-cmdline":
+        elif argv[i] == "--lstm-config-cmdline":
             args["config_cmdline"] = argv[i + 1]
     if not args.get("pwd_format"):
         args["pwd_format"] = ["list"]
