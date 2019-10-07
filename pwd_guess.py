@@ -2573,8 +2573,89 @@ def make_parser():
                               'key1=value1;key2=value2 elements. '))
     return parser
 
+
+def parse_args():
+    argv = sys.argv[1:]
+    argc = len(argv)
+    args = {
+        "profile": None,
+        "enumerate_ofile": None,
+        "arch_file": None,
+        "weight_file": None,
+        "pwd_file": None,
+        "log_level": "info",
+        "retrain": False,
+        "config": None,
+        "args": None,
+        "config_args": None,
+        "log_file": None,
+        "version": False,
+        "pre_processing_only": False,
+        "stats_only": False,
+        "calc_probability_only": False,
+        "calc_guess_number_from_cache": False,
+        "train_secondary_only": False,
+        "multi_gpu": 1,
+        "config_cmdline": "",
+    }
+    for i in range(argc):
+        if argv[i] == "--pwd-file":
+            if not args.get("pwd_file"):
+                args["pwd_file"] = [argv[i + 1]]
+            else:
+                args["pwd_file"].append(argv[i + 1])
+        elif argv[i] == "--arch-file":
+            args["arch_file"] = argv[i + 1]
+        elif argv[i] == "--weight-file":
+            args["weight_file"] = argv[i + 1]
+        elif argv[i] == "--pwd-format":
+            if not args.get("pwd_format"):
+                args["pwd_format"] = [argv[i + 1]]
+            else:
+                args["pwd_format"].append(argv[i + 1])
+        elif argv[i] == "--enumerate-ofile":
+            args["enumerate_ofile"] = argv[i + 1]
+        elif argv[i] == "--retrain":
+            args["retrain"] = True
+        elif argv[i] == "--config":
+            args["config"] = argv[i + 1]
+        elif argv[i] == "--args":
+            args["args"] = argv[i + 1]
+        elif argv[i] == "--profile":
+            args["profile"] = argv[i + 1]
+        elif argv[i] == "--log-file":
+            args["log_file"] = argv[i + 1]
+        elif argv[i] == "--log-level":
+            args["log_level"] = argv[i + 1]
+        elif argv[i] == "--version":
+            args["version"] = True
+        elif argv[i] == "--pre-processing-only":
+            args["pre_processing_only"] = True
+        elif argv[i] == "--stats-only":
+            args["stats_only"] = True
+        elif argv[i] == "--config-args":
+            args["config_args"] = argv[i + 1]
+        elif argv[i] == "--calc-probability-only":
+            args["calc_probability_only"] = True
+        elif argv[i] == "--calc-guess-number-from-cache":
+            args["calc_guess_number_from_cache"] = True
+        elif argv[i] == "--train-secondary-only":
+            args["train_secondary_only"] = True
+        elif argv[i] == "--multi-gpu":
+            args["multi_gpu"] = int(argv[i + 1])
+        elif argv[i] == "--config-cmdline":
+            args["config_cmdline"] = argv[i + 1]
+    if not args.get("pwd_format"):
+        args["pwd_format"] = ["list"]
+    # print(args)
+    return args
+    pass
+
+
 def main_entry_point():
-    args = vars(make_parser().parse_args())
+    # args = vars(make_parser().parse_args())
+    args = parse_args()
+    print(args)
     main_bundle = lambda: main(args)
     if args['profile'] is not None:
         cProfile.run('main_bundle()', filename=args['profile'])
