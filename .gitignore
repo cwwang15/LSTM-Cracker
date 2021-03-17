@@ -15,3 +15,6 @@ js/examples/test_suite.html
 js/examples
 test_data
 /model
+dist
+venv
+*.spec

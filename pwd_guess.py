@@ -23,7 +23,7 @@ import sys
 import tempfile
 import time
 
-
+# os.environ["CUDA_VISIBLE_DEVICES"] = "1"
 # This is a hack to support multiple versions of the keras library.
 # It would be better to use a solution like virtualenv.
 if 'KERAS_PATH' in os.environ:
@@ -97,7 +97,7 @@ class CharacterTable():
         return astring
 
     def encode_many(self, string_list, maxlen=None, y_vec=False):
-        maxlen = maxlen if maxlen else self.maxlen
+        maxlen = maxlen if maxlen else 40 # self.maxlen
         x_str_list = map(lambda x: self.pad_to_len(x, maxlen), string_list)
         if self.embedding and not y_vec:
             x_vec = np.zeros(shape=(len(string_list), maxlen), dtype=np.int8)
@@ -152,6 +152,7 @@ class CharacterTable():
         return self.char_indices[character]
 
     def translate(self, astring):
+        # print(f"translate: {astring}", file=sys.stderr)
         return astring
 
     @staticmethod
@@ -174,6 +175,7 @@ class OptimizingCharacterTable(CharacterTable):
     def __init__(self, chars, maxlen, rare_characters, uppercase,
                  embedding=False, padding_character=None):
         # pylint: disable=too-many-branches
+        # print("rare characters", file=sys.stderr)
         if uppercase:
             self.rare_characters = ''.join(
                 c for c in rare_characters if (
@@ -313,7 +315,7 @@ class ModelDefaults():
     training_chunk = 128
     generations = 20
     chunk_print_interval = 1000
-    lower_probability_threshold = 10**-5
+    lower_probability_threshold = 1.1 * (10**-11)
     relevel_not_matching_passwords = True
     training_accuracy_threshold = -1.0
     train_test_ratio = 10
@@ -398,12 +400,13 @@ class ModelDefaults():
             return json.loads(info_as_str)
 
     def _write_intermediate_data(self):
+        # print(f"save intermediate data: {self.intermediate_fname != MEMORY_ONLY}", file=sys.stderr)
         if self.intermediate_fname == MEMORY_ONLY:
             return
 
         self._read_intermediate_data_time = time.time()
         with open(self.intermediate_fname, 'w') as info:
-            json.dump(self._intermediate_data, info)
+            json.dump(self._intermediate_data, info, indent=2)
 
     def _check_if_should_reload(self):
         if self.intermediate_fname == MEMORY_ONLY:
@@ -1215,12 +1218,15 @@ class Filterer():
             char_freqs[key] = self.frequencies[key] / self.total_characters
 
         if save_stats:
+            # print('save stats is True', file=sys.stderr)
             self.config.set_intermediate_info(
                 'rare_character_bag', self.rare_characters())
+            # print(self.config.get_intermediate_info('rare_character_bag'), file=sys.stderr)
             logging.info('Rare characters: %s', self.rare_characters())
             logging.info('Longest pwd is : %s characters long',
                          self.longest_pwd)
-
+        else:
+            print('donot save stats', file=sys.stderr)
         if save_freqs:
             self.config.set_intermediate_info(
                 'character_frequencies', self.frequencies)
@@ -1251,6 +1257,7 @@ class ResetablePwdList():
         input_list = input_factory(self.pwd_file)
         for _ in filt.filter(input_list.as_list()):
             pass
+        # print(f"save stats is {save_stats}", file=sys.stderr)
         filt.finish(save_stats=save_stats, save_freqs=save_freqs)
         input_list.finish()
         logging.info('Done reading passwords...')
@@ -1418,6 +1425,7 @@ class ProbabilityCalculator():
         return answers
 
     def probability_stream(self, pwd_list):
+        # print("Prob Calc, preproc stream", file=sys.stderr)
         self.preproc.begin(pwd_list)
         x_strings, y_strings, _ = self.preproc.next_chunk()
         while len(x_strings) != 0:
@@ -1425,21 +1433,26 @@ class ProbabilityCalculator():
             probs = self._cached_batch_prob(x_strings)
             assert len(probs) == len(x_strings)
             for i, y_idx in enumerate(y_indices):
-                prob = np.asscalar(probs[i][0][y_idx])
+                prob = probs[i][0][y_idx].item()
                 yield x_strings[i], y_strings[i], prob
 
             x_strings, y_strings, _ = self.preproc.next_chunk()
 
     def calc_probabilities(self, pwd_list):
+        # print("Prob Calc, calc probabilities", file=sys.stderr)
         prev_prob = 1
         for item in self.probability_stream(pwd_list):
             input_string, next_char, output_prob = item
+            # print(item, file=sys.stderr)
+            # input("breakpoint 01, type any key to continue...")
             if next_char != PASSWORD_END or self.prefixes is False:
                 prev_prob *= output_prob
             if next_char == PASSWORD_END:
                 if self.template_probs:
+                    # print("template probs", file=sys.stderr)
                     prev_prob *= self.pts.find_real_pwd(
                         self.ctable.translate(input_string), input_string)
+                # print(("yield", input_string, prev_prob), file=sys.stderr)
                 yield (input_string, prev_prob)
                 prev_prob = 1
 
@@ -1460,7 +1473,7 @@ class ManyToManyProbabilityCalculator(ProbabilityCalculator):
                 for j, y_idx in enumerate(y_indices[i]):
                     if j == len(x_strings[i]):
                         break
-                    yield x_strings[i], y_strings[i][j], np.asscalar(probs[i][j][y_idx])
+                    yield x_strings[i], y_strings[i][j], probs[i][j][y_idx].item()
             x_strings, y_strings, _ = self.preproc.next_chunk()
 
 class PasswordTemplateSerializer(DelegatingSerializer):
@@ -1478,8 +1491,11 @@ class PasswordTemplateSerializer(DelegatingSerializer):
         self.lower_probability_threshold = (
             config.lower_probability_threshold
             if lower_prob_threshold is None else lower_prob_threshold)
+        # print(("begin", self.beginning_char_frequencies, 'begin over'), file=sys.stderr)
         self.beg_cache = self.cache_freqs(self.beginning_char_frequencies)
+        # print(("end", self.end_char_frequencies), file=sys.stderr)
         self.end_cache = self.cache_freqs(self.end_char_frequencies)
+        # print(("char freq", self.char_frequencies), file=sys.stderr)
         self.cache = self.cache_freqs(self.char_frequencies)
         if config.no_end_word_cache:
             self.end_cache = self.cache
@@ -1500,8 +1516,9 @@ class PasswordTemplateSerializer(DelegatingSerializer):
         return answer
 
     def _calc(self, freqs, template_char, character):
-        return freqs[character] / sum(map(
-            lambda c: freqs[c], self.preimage[template_char]))
+        # print((freqs, template_char, character, self.preimage), file=sys.stderr)
+        return freqs.get(character, 1) / sum(map(
+            lambda c: freqs.get(c, 1), self.preimage[template_char]))
 
     def calc(self, template_char, character, begin=False, end=False):
         if begin:
@@ -1539,6 +1556,7 @@ class PasswordTemplateSerializer(DelegatingSerializer):
         return answer
 
     def find_real_pwd(self, template, pwd):
+        # print("find real pwd, {template}, {pwd}", file=sys.stderr)
         if isinstance(pwd, tuple):
             pwd = ''.join(pwd)
         assert len(pwd) == len(template)
@@ -1749,15 +1767,18 @@ class Guesser():
         return pwds
 
     def do_calculate_probs_from_file(self):
+        # print("let's do", file=sys.stderr)
         if self.config.probability_steps:
             return self._use_probability_steps()
 
         pwds = self.read_test_passwords()
         logging.info('Calculating test set probabilities')
         if self.config.sequence_model == Sequence.MANY_TO_MANY:
+            # print("Many to Many", file=sys.stderr)
             return ManyToManyProbabilityCalculator(self).calc_probabilities(pwds)
 
         if self.config.sequence_model == Sequence.MANY_TO_ONE:
+            # print("Many to One", file=sys.stderr)
             return ProbabilityCalculator(self).calc_probabilities(pwds)
 
         raise ValueError(
@@ -1767,6 +1788,7 @@ class Guesser():
         return [(str(i), i) for i in self.config.probability_steps]
 
     def calculate_probs_from_file(self):
+        # print("calculate probs from file", file=sys.stderr)
         if self._calc_prob_cache is None:
             logging.info('Calculating pwd prob from file for the first time')
             self._calc_prob_cache = list(self.do_calculate_probs_from_file())
@@ -1779,15 +1801,20 @@ class Guesser():
                 self.config.rare_character_optimization_guessing)
 
     def make_serializer(self, method=None, make_rare=None):
+        # print("make_serializer", file=sys.stderr)
         if method is None:
+            # print(f"{method} is None", file=sys.stderr)
             method = self.config.guess_serialization_method
         if make_rare is None:
             make_rare = self.should_make_guesses_rare_char_optimizer
         serializer_factory = serializer_type_list[method]
         if method == 'calculator':
+            # print(f"{method} is calculator", file=sys.stderr)
             answer = serializer_factory(
                 self.ostream, self.calculate_probs_from_file())
         elif method == 'delamico_random_walk':
+            # print(f"{method} is delamico", file=sys.stderr)
+            # print(serializer_factory, file=sys.stderr)
             answer = serializer_factory(
                 self.ostream, self.calculate_probs_from_file(), self.config)
         else:
@@ -2229,6 +2256,7 @@ class RandomGenerator(RandomWalkDelAmico):
 
 class DelAmicoCalculator(GuessSerializer):
     def __init__(self, ostream, pwd_list, config):
+        # print("init DelAmico Calculator", file=sys.stderr)
         super().__init__(ostream)
         self.pwds, self.probs = zip(*sorted(pwd_list, key=lambda x: x[1]))
         self.pwds = list(self.pwds)
@@ -2264,7 +2292,8 @@ class DelAmicoCalculator(GuessSerializer):
             out_guess_numbers[j - 1] += out_guess_numbers[j]
         for i in range(len(self.guess_numbers)):
             out_variance[i] = (sum(map(
-                lambda e: (e - out_guess_numbers[i])**2, guess_nums[i])) /
+                # change: fix bug of Overflow Error
+                lambda e: min(abs(e - out_guess_numbers[i]), 2.0**120)**2, guess_nums[i])) /
                                num_guess)
         for j in range(len(out_guess_numbers) - 1, 0, -1):
             out_variance[j - 1] += out_variance[j]
@@ -2396,8 +2425,10 @@ def preprocessing(args, config):
     # must be called before creating the preprocessor because it
     # initializes statistics needed for some preprocessors
     if 'no_initialize' not in args:
+        # print('no_initialize not in args', file=sys.stderr)
         resetable.initialize()
     else:
+        # print(('no_initialize', args['no_initialize']), file=sys.stderr)
         resetable.initialize(*args['no_initialize'])
     if args['stats_only']:
         logging.info('Only getting stats. Quitting...')
@@ -2462,10 +2493,13 @@ def guess(args, config):
                .add_file(args['enumerate_ofile'])
                .build())
     if args['calc_probability_only']:
+        # print("calc_probability_only", file=sys.stderr)
         guesser.calculate_probs()
     elif args["calc_guess_number_from_cache"]:
+        # print("calc_guess_number_from_cache", file=sys.stderr)
         guesser.calculate_guess_numbers_from_cache()
     else:
+        # print("generating guesses", file=sys.stderr)
         guesser.complete_guessing()
 
 def read_config_args(args):
@@ -2484,11 +2518,16 @@ def main(args):
         sys.stdout.write(get_version_string() + '\n')
         sys.exit(0)
     if args['config_args']:
+        # print(f"use file pointed by config_args: {args['config_args']}", file=sys.stderr)
         config, args = read_config_args(args)
+        # print(("config", config), file=sys.stderr)
     else:
+        # print(f"use default args", file=sys.stderr)
         config = ModelDefaults.fromFile(args['config'])
     config.override_from_commandline(args['config_cmdline'])
     config.sequence_model_updates()
+    if args['intermediate_fname'] != MEMORY_ONLY:
+        config.intermediate_fname = args['intermediate_fname']
     if args['args']:
         with open(args['args'], 'r') as argfile:
             args = json.load(argfile)
@@ -2544,6 +2583,8 @@ def make_parser():
     parser.add_argument('--log-file')
     parser.add_argument('--log-level', default='info',
                         choices=['debug', 'info', 'warning', 'error'])
+    parser.add_argument('--intermediate-fname', default=MEMORY_ONLY,
+                        help='save rare character bag and other information')
     parser.add_argument('--version', action='store_true',
                         help='Print version number and exit')
     parser.add_argument('--pre-processing-only', action='store_true',
@@ -2575,88 +2616,8 @@ def make_parser():
     return parser
 
 
-def parse_args():
-    argv = sys.argv[1:]
-    argc = len(argv)
-    args = {
-        "profile": None,
-        "enumerate_ofile": None,
-        "arch_file": None,
-        "weight_file": None,
-        "pwd_file": None,
-        "log_level": "info",
-        "retrain": False,
-        "config": None,
-        "args": None,
-        "config_args": None,
-        "log_file": None,
-        "version": False,
-        "pre_processing_only": False,
-        "stats_only": False,
-        "calc_probability_only": False,
-        "calc_guess_number_from_cache": False,
-        "train_secondary_only": False,
-        "multi_gpu": 1,
-        "config_cmdline": "",
-    }
-    for i in range(argc):
-        if argv[i] == "--lstm-pwd-file":
-            if not args.get("pwd_file"):
-                args["pwd_file"] = [argv[i + 1]]
-            else:
-                args["pwd_file"].append(argv[i + 1])
-        elif argv[i] == "--lstm-arch-file":
-            args["arch_file"] = argv[i + 1]
-        elif argv[i] == "--lstm-weight-file":
-            args["weight_file"] = argv[i + 1]
-        elif argv[i] == "--lstm-pwd-format":
-            if not args.get("pwd_format"):
-                args["pwd_format"] = [argv[i + 1]]
-            else:
-                args["pwd_format"].append(argv[i + 1])
-        elif argv[i] == "--lstm-enumerate-ofile":
-            args["enumerate_ofile"] = argv[i + 1]
-        elif argv[i] == "--lstm-retrain":
-            args["retrain"] = True
-        elif argv[i] == "--lstm-config":
-            args["config"] = argv[i + 1]
-        elif argv[i] == "--lstm-args":
-            args["args"] = argv[i + 1]
-        elif argv[i] == "--lstm-profile":
-            args["profile"] = argv[i + 1]
-        elif argv[i] == "--lstm-log-file":
-            args["log_file"] = argv[i + 1]
-        elif argv[i] == "--lstm-log-level":
-            args["log_level"] = argv[i + 1]
-        elif argv[i] == "--lstm-version":
-            args["version"] = True
-        elif argv[i] == "--lstm-pre-processing-only":
-            args["pre_processing_only"] = True
-        elif argv[i] == "--lstm-stats-only":
-            args["stats_only"] = True
-        elif argv[i] == "--lstm-config-args":
-            args["config_args"] = argv[i + 1]
-        elif argv[i] == "--lstm-calc-probability-only":
-            args["calc_probability_only"] = True
-        elif argv[i] == "--lstm-calc-guess-number-from-cache":
-            args["calc_guess_number_from_cache"] = True
-        elif argv[i] == "--lstm-train-secondary-only":
-            args["train_secondary_only"] = True
-        elif argv[i] == "--lstm-multi-gpu":
-            args["multi_gpu"] = int(argv[i + 1])
-        elif argv[i] == "--lstm-config-cmdline":
-            args["config_cmdline"] = argv[i + 1]
-    if not args.get("pwd_format"):
-        args["pwd_format"] = ["list"]
-    # print(args)
-    return args
-    pass
-
-
 def main_entry_point():
-    # args = vars(make_parser().parse_args())
-    args = parse_args()
-    print(args)
+    args = vars(make_parser().parse_args())
     main_bundle = lambda: main(args)
     if args['profile'] is not None:
         cProfile.run('main_bundle()', filename=args['profile'])
