@@ -97,7 +97,8 @@ class CharacterTable():
         return astring
 
     def encode_many(self, string_list, maxlen=None, y_vec=False):
-        maxlen = maxlen if maxlen else 40 # self.maxlen
+        # maxlen = maxlen if maxlen else 40 # self.maxlen
+        maxlen = maxlen if maxlen else self.maxlen
         x_str_list = map(lambda x: self.pad_to_len(x, maxlen), string_list)
         if self.embedding and not y_vec:
             x_vec = np.zeros(shape=(len(string_list), maxlen), dtype=np.int8)
@@ -2562,7 +2563,7 @@ def make_parser():
                         help='Output file for the model architecture. ')
     parser.add_argument('--weight-file',
                         help='Output file for the weights of the model. ')
-    parser.add_argument('--pwd-format', default='list', nargs='+',
+    parser.add_argument('--pwd-format', default=['list'], nargs='+',
                         choices=['trie', 'tsv', 'list', 'im_trie'],
                         help=('Format of pwd-file input. "list" format is one'
                               'password per line. "tsv" format is tab '
